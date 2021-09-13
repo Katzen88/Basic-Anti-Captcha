@@ -2,145 +2,121 @@ package anticaptcha
 
 import (
 	"bytes"
-	"encoding/json"
-	"errors"
+	//"encoding/json"
+	//"errors"
 	"net/http"
-	"net/url"
+	//"net/url"
 	"time"
+	"fmt"
+	"strings"
+
+	"io/ioutil"
 )
 
 var (
-	baseURL       = &url.URL{Host: "api.anti-captcha.com", Scheme: "https", Path: "/"}
 	checkInterval = 2 * time.Second
 )
-
 type Client struct {
 	APIKey string
 }
 
-// Method to create the task to process the recaptcha, returns the task_id
-func (c *Client) createTaskRecaptcha(websiteURL string, recaptchaKey string) (float64, error) {
-	// Mount the data to be sent
-	body := map[string]interface{}{
-		"clientKey": c.APIKey,
-		"task": map[string]interface{}{
-			"type":       "NoCaptchaTaskProxyless",
-			"websiteURL": websiteURL,
-			"websiteKey": recaptchaKey,
-		},
-	}
-
-	b, err := json.Marshal(body)
-	if err != nil {
-		return 0, err
-	}
-
-	// Make the request
-	u := baseURL.ResolveReference(&url.URL{Path: "/createTask"})
-	resp, err := http.Post(u.String(), "application/json", bytes.NewBuffer(b))
-	if err != nil {
-		return 0, err
-	}
-	defer resp.Body.Close()
-
-	// Decode response
-	responseBody := make(map[string]interface{})
-	json.NewDecoder(resp.Body).Decode(&responseBody)
-	// TODO treat api errors and handle them properly
-	if _, ok := responseBody["taskId"]; ok {
-		if taskId, ok := responseBody["taskId"].(float64); ok {
-			return taskId, nil
-		}
-
-		return 0, errors.New("task number of irregular format")
-	}
-
-	return 0, errors.New("task number not found in server response")
-}
-
 // Method to check the result of a given task, returns the json returned from the api
-func (c *Client) getTaskResult(taskID float64) (map[string]interface{}, error) {
-	// Mount the data to be sent
-	body := map[string]interface{}{
-		"clientKey": c.APIKey,
-		"taskId":    taskID,
-	}
-	b, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
+func (c *Client) getTaskResult(taskID string) (string, error) {
+	//baseURL := "https://api.anti-captcha.com"
+	client := &http.Client{}
 
+	// Mount the data to be sent
+	bData := fmt.Sprintf("{ \"clientKey\":\"%s\", \"taskId\": %v}", c.APIKey, taskID)
+	var jsonStr = []byte(bData)
 	// Make the request
-	u := baseURL.ResolveReference(&url.URL{Path: "/getTaskResult"})
-	resp, err := http.Post(u.String(), "application/json", bytes.NewBuffer(b))
+	resultPreResp, err := http.NewRequest("POST","https://api.anti-captcha.com/getTaskResult", bytes.NewBuffer(jsonStr))
 	if err != nil {
-		return nil, err
+		fmt.Println(err)
 	}
-	defer resp.Body.Close()
+	resultPreResp.Header.Set("Accept", "application/json")
+	resultPreResp.Header.Set("Content-Type", "application/json")
+	resultResp, err := client.Do(resultPreResp)
+	if err != nil {
+		fmt.Println(err)
+	}
+	defer resultResp.Body.Close()
 
 	// Decode response
-	responseBody := make(map[string]interface{})
-	json.NewDecoder(resp.Body).Decode(&responseBody)
-	return responseBody, nil
+	respBody, err := ioutil.ReadAll(resultResp.Body)
+	if err != nil {
+		fmt.Println(err)
+	}
+	dSTR := fmt.Sprint(string(respBody))
+	fmt.Println(dSTR)
+	return dSTR, nil
 }
 
 
 // Method to create the task to process the image captcha, returns the task_id
-func (c *Client) createTaskImage(imgString string) (float64, error) {
+func (c *Client) createTaskImage(imgString string) (string, error) {
+	parsedIMGb := strings.Split(imgString,"base64,")[1]
 	// Mount the data to be sent
-	body := map[string]interface{}{
-		"clientKey": c.APIKey,
-		"task": map[string]interface{}{
-			"type": "ImageToTextTask",
-			"body": imgString,
-		},
-	}
-
-	b, err := json.Marshal(body)
-	if err != nil {
-		return 0, err
-	}
-
+	client := &http.Client{}
+	postBytes := fmt.Sprintf("{ \"clientKey\":\"%s\", \"task\": { \"type\":\"ImageToTextTask\", \"body\":\"%s\", \"phrase\":false, \"case\":false, \"numeric\":0, \"math\":false, \"minLength\":0, \"maxLength\":0 } }", c.APIKey, parsedIMGb)
 	// Make the request
-	u := baseURL.ResolveReference(&url.URL{Path: "/createTask"})
-	resp, err := http.Post(u.String(), "application/json", bytes.NewBuffer(b))
+	preResp, err := http.NewRequest("POST", "https://api.anti-captcha.com/createTask", strings.NewReader(postBytes))
 	if err != nil {
-		return 0, err
+		return "0", err
+	}
+	preResp.Header.Set("Accept", "application/json")
+	preResp.Header.Set("Content-Type", "application/json")
+
+	resp, err := client.Do(preResp)
+	if err != nil {
+		fmt.Println(err)
 	}
 	defer resp.Body.Close()
 
 	// Decode response
-	responseBody := make(map[string]interface{})
-	json.NewDecoder(resp.Body).Decode(&responseBody)
+	respBody, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		fmt.Println(err)
+	}
+	fmt.Println(string(respBody))
+	parsedTaskID := strings.Split(string(respBody),"taskId\":")[1]
+	taskID := strings.ReplaceAll(parsedTaskID, "}", "")
+	fmt.Println(taskID)
 	// TODO treat api errors and handle them properly
-	return responseBody["taskId"].(float64), nil
+	return taskID, nil
 }
 
 // SendImage Method to encapsulate the processing of the image captcha
 // Given a base64 string from the image, it sends to the api and waits until
 // the processing is complete to return the evaluated key
 func (c *Client) SendImage(imgString string) (string, error) {
+	//fmt.Println(imgString)
 	// Create the task on anti-captcha api and get the task_id
+
 	taskID, err := c.createTaskImage(imgString)
+	fmt.Println("cow talk")
 	if err != nil {
 		return "", err
 	}
+	fmt.Println("cow talk", taskID)
 
 	// Check if the result is ready, if not loop until it is
 	response, err := c.getTaskResult(taskID)
 	if err != nil {
 		return "", err
 	}
+	var respBodySTRk string
 	for {
-		if response["status"] == "processing" {
+		respBodySTR := fmt.Sprintf(response)
+		if strings.Contains(respBodySTR, "status\":\"processing\""){
 			time.Sleep(checkInterval)
 			response, err = c.getTaskResult(taskID)
 			if err != nil {
 				return "", err
 			}
 		} else {
+			respBodySTRk = fmt.Sprintf(respBodySTR)
 			break
 		}
 	}
-	return response["solution"].(map[string]interface{})["text"].(string), nil
+	return respBodySTRk, nil
 }
