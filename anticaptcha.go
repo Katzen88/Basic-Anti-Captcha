@@ -19,7 +19,7 @@ type Client struct {
 }
 
 // Method to create the task to process the recaptcha, returns the task_id
-func (c *Client) createTaskRecaptcha(websiteURL string, recaptchaKey string) (float64, error) {
+func (c *Client) createTaskRecaptcha(websiteURL string, recaptchaKey string) (string, error) {
 	// Mount the data to be sent
 	body := map[string]interface{}{
 		"clientKey": c.APIKey,
@@ -48,7 +48,7 @@ func (c *Client) createTaskRecaptcha(websiteURL string, recaptchaKey string) (fl
 	json.NewDecoder(resp.Body).Decode(&responseBody)
 	// TODO treat api errors and handle them properly
 	if _, ok := responseBody["taskId"]; ok {
-		if taskId, ok := responseBody["taskId"].(float64); ok {
+		if taskId, ok := responseBody["taskId"].(string); ok {
 			return taskId, nil
 		}
 
@@ -59,7 +59,7 @@ func (c *Client) createTaskRecaptcha(websiteURL string, recaptchaKey string) (fl
 }
 
 // Method to check the result of a given task, returns the json returned from the api
-func (c *Client) getTaskResult(taskID float64) (map[string]interface{}, error) {
+func (c *Client) getTaskResult(taskID string) (map[string]interface{}, error) {
 	// Mount the data to be sent
 	body := map[string]interface{}{
 		"clientKey": c.APIKey,
@@ -114,7 +114,7 @@ func (c *Client) SendRecaptcha(websiteURL string, recaptchaKey string, timeoutIn
 }
 
 // Method to create the task to process the image captcha, returns the task_id
-func (c *Client) createTaskImage(imgString string) (float64, error) {
+func (c *Client) createTaskImage(imgString string) (string, error) {
 	// Mount the data to be sent
 	body := map[string]interface{}{
 		"clientKey": c.APIKey,
