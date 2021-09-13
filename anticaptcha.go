@@ -32,14 +32,14 @@ func (c *Client) createTaskRecaptcha(websiteURL string, recaptchaKey string) (st
 
 	b, err := json.Marshal(body)
 	if err != nil {
-		return 0, err
+		return "0", err
 	}
 
 	// Make the request
 	u := baseURL.ResolveReference(&url.URL{Path: "/createTask"})
 	resp, err := http.Post(u.String(), "application/json", bytes.NewBuffer(b))
 	if err != nil {
-		return 0, err
+		return "0", err
 	}
 	defer resp.Body.Close()
 
@@ -52,10 +52,10 @@ func (c *Client) createTaskRecaptcha(websiteURL string, recaptchaKey string) (st
 			return taskId, nil
 		}
 
-		return 0, errors.New("task number of irregular format")
+		return "0", errors.New("task number of irregular format")
 	}
 
-	return 0, errors.New("task number not found in server response")
+	return "0", errors.New("task number not found in server response")
 }
 
 // Method to check the result of a given task, returns the json returned from the api
@@ -126,14 +126,14 @@ func (c *Client) createTaskImage(imgString string) (string, error) {
 
 	b, err := json.Marshal(body)
 	if err != nil {
-		return 0, err
+		return "0", err
 	}
 
 	// Make the request
 	u := baseURL.ResolveReference(&url.URL{Path: "/createTask"})
 	resp, err := http.Post(u.String(), "application/json", bytes.NewBuffer(b))
 	if err != nil {
-		return 0, err
+		return "0", err
 	}
 	defer resp.Body.Close()
 
